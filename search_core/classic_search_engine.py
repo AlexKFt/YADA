@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-import text_processing.text_processing as proc
+import text_processing.query_processing as proc
 
 
 class ClassicSearchEngine:

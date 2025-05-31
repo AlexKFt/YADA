@@ -4,8 +4,12 @@ import time
 
 import search_core.classic_search_engine as search
 import search_core.knowledge_base as kb
+
 import storage_management.files_management as fm
-import text_processing.text_processing as proc
+import storage_management.utils as fm_utils
+
+from text_processing.query_processing import TextPreparator
+import text_processing.document_processing as dproc
 
 
 def measure_time(func, *args, **kwargs):
@@ -35,16 +39,17 @@ def cum_method_metric_for_texts(fun, key_words: list[str], texts: list[str]):
 def read_uploaded_files(uploaded_files, reader):
     file_names = set()
     corpus_of_files = []
-    if type(uploaded_files) == list:
-        for ufile in uploaded_files:
-            file_names.add(ufile.name)
-        app_state.name_to_path_dict = fm.get_paths_from_names(file_names, FILES_ROOT)
-        for name in app_state.name_to_path_dict.keys():
-            path = app_state.name_to_path_dict[name]
-            file_text = reader.read_file(path, True)
-            print(f"filename: {ufile.name} len: {len(file_text)}")
-            file = fm.TextSector(path, file_text, len(file_text))
-            corpus_of_files.append(file)
+
+    for ufile in uploaded_files:
+        file_names.add(ufile.name)
+    app_state.name_to_path_dict = fm_utils.get_paths_from_names(file_names, FILES_ROOT)
+    for name in app_state.name_to_path_dict.keys():
+        path = app_state.name_to_path_dict[name]
+        file_text = reader.read_file(path, True)
+        print(f"filename: {ufile.name} len: {len(file_text)}")
+        file = fm.TextSector(path, file_text, len(file_text))
+        corpus_of_files.append(file)
+
     return corpus_of_files
 
 
@@ -61,10 +66,11 @@ def get_names_by_index(indexes, corpus_sectors):
 
 class GlobalState:
     def __init__(self):
+        term_dict = fm_utils.parse_dict_json(r"C:\Users\Alexander\source\yada\Storage\oil_and_gas_dict.json")
 
-        self.knowledge_base = kb.KnowledgeBase()
+        self.knowledge_base = kb.KnowledgeBase(term_dict=term_dict)
         self.reader = fm.Reader()
-        self.preparator = proc.TextPreparator()
+        self.preparator = TextPreparator()
 
         self.ready_for_file_load = True
         self.start_search = False
@@ -111,18 +117,18 @@ if st.button("Проиндексировать выбранные файлы"):
 if st.button("Сохранить полученный индекс в файл"):
     app_state.waiting_for_writing_index_file = True
 
-app_state.current_index = st.text_input("Введите имя файла индекса для записи:", value=fm.get_beauty_file_name(app_state.current_index))
+app_state.current_index = st.text_input("Введите имя файла индекса для записи:", value=fm_utils.get_beauty_file_name(app_state.current_index))
 
 # Описание процесса сохранения рабочего индекса на диск
 if app_state.waiting_for_writing_index_file:
     if app_state.current_index:
         app_state.current_index_descriptor = os.path.join(FILES_ROOT, app_state.current_index.split(".")[0] + ".msgpack")
         app_state.knowledge_base.write_index_file(os.path.join(FILES_ROOT, app_state.current_index))
-        fm.serialize(app_state.corpus_sectors, app_state.current_index_descriptor)
+        fm.serialize_text_sectors(app_state.corpus_sectors, app_state.current_index_descriptor)
         st.write(f"Данные загружены в {app_state.current_index}!")
     else:
         app_state.knowledge_base.write_index_file(app_state.default_index)
-        fm.serialize(app_state.corpus_sectors, app_state.default_index_descriptor)
+        fm.serialize_text_sectors(app_state.corpus_sectors, app_state.default_index_descriptor)
         st.write(f"Данные загружены в {app_state.default_index}!")
     app_state.waiting_for_writing_index_file = False
 
@@ -179,15 +185,12 @@ if uploaded_files and app_state.ready_for_file_load:
         app_state.file_names = list(set(app_state.corpus_of_files[i].filename for i in range(len(app_state.corpus_of_files))))
 
         app_state.texts = []
-        # corpus_sectors = reader.split_corpus(corpus, CORPUS_SECTOR_LENGTH, file_sectors)
-        app_state.corpus_sectors = measure_time(app_state.reader.split_corpus_v2, app_state.corpus_of_files,
+        app_state.corpus_sectors = measure_time(dproc.split_corpus_v2, app_state.corpus_of_files,
                                                 CORPUS_SECTOR_LENGTH)
 
         app_state.texts = [tp.text for tp in app_state.corpus_sectors]
-        # knowledge_base.build_corpus(texts)
         texts_for_model = [app_state.preparator.preprocess_text(text) for text in app_state.texts]
         measure_time(app_state.knowledge_base.build_corpus, texts_for_model)
-        # b25_engine = bm25.BM25WeakAND({i: texts[i] for i in range(len(texts))})
         app_state.bm25_engine = measure_time(search.ClassicSearchEngine,
                                              {i: app_state.texts[i] for i in range(len(app_state.texts))})
 
@@ -245,7 +248,7 @@ if query and app_state.start_search:
             app_state.sem_search_end = True
 
         if use_filename_search:
-            app_state.beauty_file_names = [fm.get_beauty_file_name(file_name).lower() for file_name in app_state.file_names]
+            app_state.beauty_file_names = [fm_utils.get_beauty_file_name(file_name).lower() for file_name in app_state.file_names]
             app_state.file_names_lookup = measure_time(cum_method_metric_for_texts, search.straight_search,
                                                        app_state.stemmed_words, app_state.beauty_file_names)
             app_state.lookup_filename_end = True
@@ -321,7 +324,7 @@ if app_state.show_res:
             for i, d in zip(app_state.I[0], app_state.D[0]):
                 if app_state.corpus_sectors[i].filename == file:
                     st.markdown(f"*Ранг по семантическому поиску:{d}, оценка по BM25: {score}, найдено {matched} совпадений")
-                    st.write(fm.get_beauty_file_name(app_state.corpus_sectors[i].filename))
+                    st.write(fm_utils.get_beauty_file_name(app_state.corpus_sectors[i].filename))
                     st.write(app_state.corpus_sectors[i].text)
                     st.markdown("---")
     else:
@@ -339,14 +342,14 @@ if app_state.show_res:
         if use_tf_idf and app_state.tf_idf_search_end:
             for doc_id, score, matched in app_state.tf_idf_res:
                 st.markdown(f"TF-IDF score={score:.4f}, matched_terms={matched}")
-                st.write(fm.get_beauty_file_name(app_state.corpus_sectors[doc_id].filename))
+                st.write(fm_utils.get_beauty_file_name(app_state.corpus_sectors[doc_id].filename))
                 st.write(app_state.corpus_sectors[doc_id].text)
                 st.markdown("---")
         if use_semantic_search and app_state.sem_search_end:
             k = 1
             for idx, dist in zip(app_state.I[0], app_state.D[0]):
                 st.markdown(f"**Sentence Transformer rang:** {k}")
-                st.write(fm.get_beauty_file_name(app_state.corpus_sectors[idx].filename))
+                st.write(fm_utils.get_beauty_file_name(app_state.corpus_sectors[idx].filename))
                 st.write(app_state.corpus_sectors[idx].text)
                 st.markdown("---")
                 k += 1
@@ -354,7 +357,7 @@ if app_state.show_res:
         if use_bm25 and app_state.bm25_search_end:
             for doc_id, score, matched in app_state.bm_25_res:
                 st.markdown(f"BM25 score={score:.4f}, matched_terms={matched}")
-                st.write(fm.get_beauty_file_name(app_state.corpus_sectors[doc_id].filename))
+                st.write(fm_utils.get_beauty_file_name(app_state.corpus_sectors[doc_id].filename))
                 st.write(app_state.corpus_sectors[doc_id].text)
                 st.markdown("---")
 
@@ -366,8 +369,8 @@ if app_state.selected_file:
         if app_state.selected_file in app_state.name_to_path_dict:
             name = app_state.name_to_path_dict[app_state.selected_file]
         else:
-            name = fm.get_paths_from_names(set(app_state.selected_file), FILES_ROOT)[app_state.selected_file]
-    beauty_name = fm.get_beauty_file_name(app_state.selected_file)
+            name = fm_utils.get_paths_from_names(set(app_state.selected_file), FILES_ROOT)[app_state.selected_file]
+    beauty_name = fm_utils.get_beauty_file_name(app_state.selected_file)
     st.subheader(f"Файл: {beauty_name}")
     st.download_button(
         label="📥 Скачать",

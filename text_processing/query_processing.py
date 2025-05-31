@@ -41,22 +41,3 @@ class TextPreparator:
             self.text += self.preprocess_text(frase, lemmatization=lemmatization, stop_words_del=stop_words_del,
                                              stemming=stemming) + " "
         return self.text.split()
-
-
-def get_sentence(text: str, pos: int, by_sentence: bool = True):
-    if by_sentence:
-        start = end = pos
-        while start != 0 and text[start] != '.':
-            start -= 1
-        while end != len(text) and text[end] != '.':
-            end += 1
-
-        return text[start + 1: end]
-    else:
-        neighbourhood = 50
-        start = pos - neighbourhood
-        end = pos + neighbourhood
-        if start < 0:
-            start = 0
-        if end >= len(text):
-            end = len(text)

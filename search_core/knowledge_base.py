@@ -1,18 +1,15 @@
 import math
-import storage_management.files_management as fm
 import torch
 from transformers import AutoTokenizer, AutoModel
-import torch.nn.functional as F
 import faiss
-import numpy as np
 
 
 class KnowledgeBase:
-    def __init__(self, model_name='sentence-transformers/all-MiniLM-L6-v2', device=None):
+    def __init__(self, model_name='sentence-transformers/all-MiniLM-L6-v2', device=None, term_dict=None):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name).to(self.device)
-        self.term_dict = fm.parse_dict_json(r"C:\Users\Alexander\source\yada\Storage\oil_and_gas_dict.json")
+        self.term_dict = term_dict if term_dict else dict()
         self.corpus_embeddings = None
         self.corpus_texts = None
         self.index = None
@@ -25,7 +22,7 @@ class KnowledgeBase:
         self.corpus_embeddings = self.encode(corpus_texts)
         emb_np = self.corpus_embeddings.numpy().astype('float32')
         dim = emb_np.shape[1]
-        quantizer = faiss.IndexFlatL2(dim)  # d — размерность векторов
+        quantizer = faiss.IndexFlatL2(dim)  # dim — размерность векторов
         self.index = faiss.IndexIVFFlat(quantizer, dim, nlist)  # nlist — число кластеров
         self.index.train(emb_np)  # Обучение
         self.index.add(emb_np)
