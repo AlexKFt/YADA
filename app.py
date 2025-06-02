@@ -66,7 +66,7 @@ def get_names_by_index(indexes, corpus_sectors):
 
 class GlobalState:
     def __init__(self):
-        term_dict = fm_utils.parse_dict_json(r"C:\Users\Alexander\source\yada\Storage\oil_and_gas_dict.json")
+        term_dict = fm_utils.parse_dict_json(r"C:\Users\Alexander\source\yada\Storage\extension_dicts\oil_and_gas_dict.json")
 
         self.knowledge_base = kb.KnowledgeBase(term_dict=term_dict)
         self.reader = fm.Reader()

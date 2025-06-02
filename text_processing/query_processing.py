@@ -4,7 +4,7 @@ import re
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
 
-
+# nltk.download('stopwords')
 class TextPreparator:
     def __init__(self, text="", language="russian"):
         self.language = language

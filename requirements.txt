@@ -2,8 +2,22 @@ numpy<2
 --extra-index-url https://download.pytorch.org/whl/cu126
 transformers~=4.51.3
 pandas~=2.2.3
-torch~=2.6.0+cu126
+torch~=2.6.0
 streamlit~=1.45.1
+streamlit-ace
 fastapi~=0.115.11
 pydantic~=2.10.6
 pymorphy3~=2.0.3
+accelerate
+faiss-cpu
+msgpack
+scikit-learn
+sentence-transformers
+regex
+rake-nltk
+nltk
+gensim
+PyMuPDF
+fitz
+python-docx
+uvicorn
